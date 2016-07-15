@@ -4,6 +4,10 @@ import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
 
 class SpawnProcessTask extends DefaultSpawnTask {
+
+    static final WAITING_DELAY = 30000
+
+    File stdOutDir
     String command
     String ready
 
@@ -44,17 +48,12 @@ class SpawnProcessTask extends DefaultSpawnTask {
     }
 
     private boolean waitUntilIsReadyOrEnd(Process process) {
-        def line
-        def reader = new BufferedReader(new InputStreamReader(process.getInputStream()))
-        boolean isReady = false
-        while ((line = reader.readLine()) != null && !isReady) {
-            logger.quiet line
-            if (line.contains(ready)) {
-                logger.quiet "$command is ready."
-                isReady = true
-            }
+        def spawnManager = new SpawnTaskExecutor(process, ready, command, stdOutDir);
+        spawnManager.executeSpawnTask();
+        synchronized (spawnManager) {
+            spawnManager.wait(WAITING_DELAY)
         }
-        isReady
+        spawnManager.isReady
     }
 
     private Process buildProcess(String directory, String command) {
